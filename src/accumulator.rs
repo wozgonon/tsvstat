@@ -82,6 +82,24 @@ impl Accumulator {
     }
 }
 
+#[test]
+fn test_accumulator_after_one_entry ()
+{
+	let mut a = Accumulator::new ();
+	a.update(0.0);
+	print!("MEAN {}\n", a.mean());
+	print!("SKEW {}\n", a.skew());
+	print!("KURT {}\n", a.kurtosis());
+	assert!(a.count()==1);
+	assert!(a.sum()==0.0);
+	assert!(a.mean()==0.0);
+	assert!(a.sd()==0.0);
+	assert!(a.variance()==0.0);
+	assert!(a.skew().is_nan());
+	assert!(a.excess_kurtosis().is_nan());
+	assert!(a.kurtosis().is_nan());
+}
+
 /// Generates a table of summary statistics for a sequence of rows of numerical data.
 
 pub struct Accumulators {

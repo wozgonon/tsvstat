@@ -7,6 +7,14 @@ given a table of numerical observations in  [TSV](https://en.wikipedia.org/wiki/
 cat tests/test1.tsv | tsvstat.exe
 ```
 
+## To build
+
+```
+$ cargo build
+$ cargo tests
+$ cargo install
+```
+
 ## Summary statistics
 
 * count and sum
