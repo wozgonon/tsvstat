@@ -1,0 +1,6 @@
+[package]
+name = "tsvstat"
+version = "0.1.0"
+authors = ["jb <wozgonon@gmail.com>"]
+
+[dependencies]
