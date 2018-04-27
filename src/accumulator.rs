@@ -8,31 +8,52 @@ pub struct Accumulator {
     pub count: i64,
     pub min:   f64,
     pub max:   f64,
-    pub sum:   f64,
-    pub sum2:  f64,
-    pub sum3:  f64,
-    pub sum4:  f64
+    pub sum:   Sum,
+    pub sum2:  Sum,
+    pub sum3:  Sum,
+    pub sum4:  Sum
 }
 
+#[derive(Copy, Clone)]
+pub struct Sum {
+    pub sum:   f64,
+    pub compensation:   f64
+}
+
+impl Sum {
+    pub fn zero () -> Sum {
+        return Sum { compensation: 0., sum: 0. }
+    }
+    /// See https://en.wikipedia.org/wiki/Kahan_summation_algorithm
+    fn add (&mut self, input : f64)  {
+        let y = input - self.compensation; // Please see https://en.wikipedia.org/wiki/Kahan_summation_algorithm
+        let t = self.sum + y;              // If sum is big but y is small then the low-order bits of y will be lost.
+        self.compensation = (t - self.sum) - y; // (t - sum) eliminates the high order part of y and subtracting y recovers the low order part of y.
+        self.sum = t;                           //  Next time, the lost low order part of y will be compensated for by adding to the input.
+    }
+    fn as_f64 (self) -> f64 {
+        return self.sum;
+    }
+}
 impl Accumulator {
     pub fn new () -> Accumulator {
-        return Accumulator { count: 0, min: f64::INFINITY, max: f64::NEG_INFINITY, sum: 0., sum2: 0., sum3: 0., sum4: 0.}
+        return Accumulator { count: 0, min: f64::INFINITY, max: f64::NEG_INFINITY, sum: Sum::zero(), sum2: Sum::zero(), sum3: Sum::zero(), sum4: Sum::zero()}
     }
     pub fn update (&mut self, input: f64) {
     	self.count = self.count + 1;
         self.min   = if self.min < input { self.min } else { input };
         self.max   = if self.max > input { self.max } else { input };
-        self.sum   = self.sum + input;
+        self.sum.add (input);
         let square = input * input;
-        self.sum2  = self.sum2  + square;
-        self.sum3  = self.sum3  + square*input;
-        self.sum4  = self.sum4  + square*square;
+        self.sum2.add (square);
+        self.sum3.add (square*input);
+        self.sum4.add(square*square);
     }
     pub fn count (&self) -> i64 {
         return self.count;
     }
     pub fn sum (&self) -> f64 {
-        return self.sum;
+        return self.sum.as_f64();
     }
     pub fn min (&self) -> f64 {
         return self.min;
@@ -44,14 +65,19 @@ impl Accumulator {
         return self.max - self.min;
     }
     pub fn mean(&self) -> f64 {
-        return self.sum / self.count as f64;
+        return self.sum.as_f64() / self.count as f64;
+    }
+    fn unscaled_variance(&self) -> f64 {
+        let sum = self.sum.as_f64();
+        let sum2 = self.sum2.as_f64();
+        return sum2 - sum * sum / self.count as f64;
     }
     /// Sample variance
     pub fn variance(&self) -> f64 {
-        return (self.sum2 - self.sum * self.sum / self.count as f64) / (self.count-1) as f64;
+        return self.unscaled_variance() / (self.count-1) as f64;
     }
     pub fn population_variance(&self) -> f64 {
-        return (self.sum2 - self.sum * self.sum / self.count as f64) / self.count as f64;
+        return self.unscaled_variance() / self.count as f64;
     }
     /// Sample standard deviation
     pub fn sd(&self) -> f64 {
@@ -64,7 +90,7 @@ impl Accumulator {
  	let sd     = self.variance ().sqrt ();
  	let sd3    = sd*sd*sd;
 	let scale  = nn /(nn-1.)/(nn-2.);
-	return (self.sum3 - 3.0*mean*self.sum2 + 2.0*nn*mean*mean*mean) / sd3 * scale;
+	return (self.sum3.as_f64() - 3.0*mean*self.sum2.as_f64() + 2.0*nn*mean*mean*mean) / sd3 * scale;
     }
     /// See https://en.wikipedia.org/wiki/Kurtosis
     pub fn kurtosis(&self) -> f64 {
@@ -75,7 +101,7 @@ impl Accumulator {
 	let mean4  = mean2*mean2;
 	let scale  = nn*(nn+1.)/(nn-1.)/(nn-2.)/(nn-3.);
 	let offset = 3.*(nn-1.)*(nn-1.)/(nn-2.)/(nn-3.);
-	return (self.sum4 - 4.0*mean*self.sum3 + 6.0*self.sum2*mean2 - 3.*nn*mean4) / (var*var) * scale - offset;
+	return (self.sum4.as_f64() - 4.0*mean*self.sum3.as_f64() + 6.0*self.sum2.as_f64()*mean2 - 3.*nn*mean4) / (var*var) * scale - offset;
     }
     pub fn excess_kurtosis(&self) -> f64 {
     	return self.kurtosis () - 3.0;
@@ -163,7 +189,24 @@ impl Accumulators {
 mod tests {
 
     use accumulator::Accumulator;
-    
+    use accumulator::Sum;
+
+    #[test]
+    fn sum_should_add_up () {
+        let mut value = Sum::zero ();
+        assert_eq!(0., value.as_f64());
+        value.add(1.);
+        assert_eq!(1., value.as_f64());
+        value.add(-2.5);
+        assert_eq!(-1.5, value.as_f64());
+        value.add(8.5);
+        assert_eq!(7., value.as_f64());
+        value.add(101.1);
+        assert_eq!(108.1, value.as_f64());
+    }
+
+
+
     ///  This macro is for checking that two floating point numbers have the same value or both are NaN.
     ///  since Nan!=Nan by definition, one cannot just rely on assert_eq!
 
