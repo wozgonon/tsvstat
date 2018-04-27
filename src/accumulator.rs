@@ -197,6 +197,7 @@ mod tests {
     use std::f64::consts::E;
     use std::f64;
     use std::ops::Range;
+    use accumulator::Accumulators;
 
     #[test]
     fn sum_should_add_up () {
@@ -247,33 +248,6 @@ mod tests {
         });
     }
 
-    macro_rules! accumulator_test_for_multiple_inputs {
-        ($($name:ident: $expected:expr;  $inputs:expr,)*) => {
-            $(
-                #[test]
-                fn $name() {
-                    let (expected_variance, expected_skew, expected_kurtosis) = $expected;
-	            let mut a = Accumulator::new ();
-                let mut sum = 0.;
-	            for input in $inputs.iter() {
-	               a.update(*input as f64);
-	               sum = sum + input;
-                }
-	            assert_eq!(a.count(), $inputs.len() as u64);
-	            assert_eq!(a.sum(), sum);
-	            assert_eq!(a.mean(), sum/(a.count() as f64), "Mean");
-	            assert_eq_or_nan!(expected_variance, a.variance());
-	            assert_eq_or_nan!(expected_skew,a.skew());
-	            assert_eq_or_nan!(expected_kurtosis,a.kurtosis());
-
-            	assert_eq_or_nan!(a.sd(), a.variance().sqrt());
-	            assert_eq_or_nan!(a.coefficient_of_variation(), a.sd () / a.mean ());
-	            assert_eq_or_nan!(a.kurtosis(), a.excess_kurtosis() + 3.0);
-                }
-            )*
-        }
-    }
-
     #[test]
     fn test_accumulator_0_input () {
         let a = Accumulator::new ();
@@ -283,10 +257,38 @@ mod tests {
         assert_eq_or_nan!(f64::NAN, a.variance());
         assert_eq_or_nan!(f64::NAN,a.skew());
         assert_eq_or_nan!(f64::NAN,a.kurtosis());
-
         assert_eq_or_nan!(a.sd(), a.variance().sqrt());
         assert_eq_or_nan!(a.coefficient_of_variation(), a.sd () / a.mean ());
         assert_eq_or_nan!(a.kurtosis(), a.excess_kurtosis() + 3.0);
+    }
+
+    fn test_accumulator (a : Accumulator, expected_count : u64, expected_sum : f64, expected_variance : f64, expected_skew : f64, expected_kurtosis : f64) {
+        assert_eq!(a.count(), expected_count as u64);
+        assert_eq!(a.sum(), expected_sum );
+        assert_eq!(a.mean(), expected_sum / expected_count as f64 , "Mean");
+        assert_eq_or_nan!(expected_variance, a.variance());
+        assert_eq_or_nan!(expected_skew,a.skew());
+        assert_eq_or_nan!(expected_kurtosis,a.kurtosis());
+        assert_eq_or_nan!(a.sd(), a.variance().sqrt());
+        assert_eq_or_nan!(a.coefficient_of_variation(), a.sd () / a.mean ());
+        assert_eq_or_nan!(a.kurtosis(), a.excess_kurtosis() + 3.0);
+    }
+    macro_rules! accumulator_test_for_multiple_inputs {
+        ($($name:ident: $expected:expr;  $inputs:expr,)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    let (expected_variance, expected_skew, expected_kurtosis) = $expected;
+    	            let mut a = Accumulator::new ();
+                    let mut sum = 0.;
+	                for input in $inputs.iter() {
+	                   a.update(*input as f64);
+	                   sum = sum + input;
+                    }
+                    test_accumulator (a, $inputs.len()  as u64, sum, expected_variance, expected_skew, expected_kurtosis);
+                }
+            )*
+        }
     }
 
     accumulator_test_for_multiple_inputs! {
@@ -304,5 +306,31 @@ mod tests {
         test_accumulator_4_inputs_4: (0.25, -2.0, 4.0); [1.0, 1.0, 1.0, 0.0],
         test_accumulator_4_inputs_5: (2.25,  2.0, 4.0); [4.0, 1.0, 1.0, 1.0],
         test_accumulator_4_inputs_6: (2.0,  0.8838834764831842, -1.75); [1.0, 4.0, 1.0, 3.0, 1.0],  // TODO Check OpenOffice gave: 0.883883476483184
+    }
+
+    #[test]
+    fn accumulators_should_read_and_sumarise_data () {
+        let mut a = Accumulators::new();
+        assert_eq!(0, a.column());
+        assert_eq!(0, a.rows());
+        assert_eq!(0, a.headers.len ());
+        a.new_row();
+        a.add_column_value("1");
+        a.add_column_value("4");
+        a.new_row();
+        a.add_column_value("2");
+        a.add_column_value("3");
+        a.new_row();
+        a.add_column_value("3");
+        a.add_column_value("2");
+        a.new_row();
+        a.add_column_value("4");
+        a.add_column_value("1");
+        assert_eq!(2, a.column());
+        assert_eq!(4, a.rows());
+        assert_eq!(2, a.columns.len());
+        assert_eq!(2, a.headers.len ());
+        test_accumulator (a.columns[0], 4, 10., 1.6666666666666667, 0., -1.200000000000001);
+        test_accumulator (a.columns[1], 4, 10., 1.6666666666666667, 0., -1.200000000000001);
     }
 }
