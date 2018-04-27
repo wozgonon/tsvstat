@@ -24,6 +24,7 @@ $ cargo install
 * [Skew](https://en.wikipedia.org/wiki/skew)
 * [Kurtosis and excess Kurtosis](https://en.wikipedia.org/wiki/kurtosis)
 
+
 ## Future additions
 
 * Distribution tests such as jarque barra normality test

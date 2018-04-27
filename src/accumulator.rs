@@ -46,33 +46,36 @@ impl Accumulator {
     pub fn mean(&self) -> f64 {
         return self.sum / self.count as f64;
     }
+    /// Sample variance
     pub fn variance(&self) -> f64 {
+        return (self.sum2 - self.sum * self.sum / self.count as f64) / (self.count-1) as f64;
+    }
+    pub fn population_variance(&self) -> f64 {
         return (self.sum2 - self.sum * self.sum / self.count as f64) / self.count as f64;
     }
+    /// Sample standard deviation
     pub fn sd(&self) -> f64 {
         return self.variance().sqrt();
     }
     /// See [Skewness](https://en.wikipedia.org/wiki/Skewness)
     pub fn skew(&self) -> f64 {
-    	let divisor = self.count as f64;  // Population nn, Sample would be: nn -1;
- 	let e_x3    = self.sum3 / divisor; // Third Non-Central Moment;
- 	let mean    = self.mean ();
- 	let sd      = self.sd ();
- 	let sd2     = sd*sd;
- 	let sd3     = sd2*sd;
- 	return (e_x3 -3.0*mean*sd2  -mean*mean*mean) / sd3;
+	let nn     = self.count as f64;   // Population nn, Sample would be: nn -1;
+ 	let mean   = self.mean ();
+ 	let sd     = self.variance ().sqrt ();
+ 	let sd3    = sd*sd*sd;
+	let scale  = nn /(nn-1.)/(nn-2.);
+	return (self.sum3 - 3.0*mean*self.sum2 + 2.0*nn*mean*mean*mean) / sd3 * scale;
     }
     /// See https://en.wikipedia.org/wiki/Kurtosis
     pub fn kurtosis(&self) -> f64 {
-	let  divisor = self.count as f64;  // Population: nn, Sample would be: nn -1;
-	let  e_x2    = self.sum2 / divisor; // Second Non-Central Moment;
-	let  e_x3    = self.sum3 / divisor; // Third Non-Central Moment;
-	let  e_x4    = self.sum4 / divisor; // Fourth Non-Central Moment;
-	let  mean    = self.mean ();
-	let  var     = self.variance ();
-	let  mean2   = mean*mean;
-	let  mean4   = mean2*mean2;
-	return (e_x4 - 4.0*e_x3*mean + 6.0*e_x2*mean2 -4.0*mean4 + mean4  )   / (var*var);
+	let nn     = self.count as f64;   // Population nn, Sample would be: nn -1;
+	let mean   = self.mean ();
+	let var    = self.variance ();
+	let mean2  = mean*mean;
+	let mean4  = mean2*mean2;
+	let scale  = nn*(nn+1.)/(nn-1.)/(nn-2.)/(nn-3.);
+	let offset = 3.*(nn-1.)*(nn-1.)/(nn-2.)/(nn-3.);
+	return (self.sum4 - 4.0*mean*self.sum3 + 6.0*self.sum2*mean2 - 3.*nn*mean4) / (var*var) * scale - offset;
     }
     pub fn excess_kurtosis(&self) -> f64 {
     	return self.kurtosis () - 3.0;
@@ -80,24 +83,6 @@ impl Accumulator {
     pub fn coefficient_of_variation(&self) -> f64 {
         return self.sd () / self.mean ();
     }
-}
-
-#[test]
-fn test_accumulator_after_one_entry ()
-{
-	let mut a = Accumulator::new ();
-	a.update(0.0);
-	print!("MEAN {}\n", a.mean());
-	print!("SKEW {}\n", a.skew());
-	print!("KURT {}\n", a.kurtosis());
-	assert!(a.count()==1);
-	assert!(a.sum()==0.0);
-	assert!(a.mean()==0.0);
-	assert!(a.sd()==0.0);
-	assert!(a.variance()==0.0);
-	assert!(a.skew().is_nan());
-	assert!(a.excess_kurtosis().is_nan());
-	assert!(a.kurtosis().is_nan());
 }
 
 /// Generates a table of summary statistics for a sequence of rows of numerical data.
@@ -145,7 +130,7 @@ impl Accumulators {
     }
 
     fn print_array (&self, name : &str, function : &Fn(&Accumulator) -> f64) {
-       print! ("{}: ", name);
+       print! ("{}", name);
        for s in self.columns.iter() {
        	   print! ("\t{:.2}", function(s));
        }
@@ -170,5 +155,168 @@ impl Accumulators {
     	self.print_array ("Kurt",  &| s| s.kurtosis () );
     	self.print_array ("xKurt",  &| s| s.excess_kurtosis () );
     	self.print_array ("CV",    &| s| s.coefficient_of_variation() );
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    use accumulator::Accumulator;
+    
+    ///  This macro is for checking that two floating point numbers have the same value or both are NaN.
+    ///  since Nan!=Nan by definition, one cannot just rely on assert_eq!
+
+    macro_rules! assert_eq_or_nan {
+        ($left:expr, $right:expr) => ({
+            match (&$left, &$right) {
+                (left_val, right_val) => {
+                    if !(*left_val == *right_val) {
+                        if !((*left_val).is_nan() && (*right_val).is_nan()) {
+                            panic!(r#"assertion failed: `(left == right)`
+  left: `{:?}`,
+ right: `{:?}`"#, left_val, right_val)
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    ///  This macro tests for data sets with only one observation.
+    
+    macro_rules! accumulator_test_for_1_input {
+        ($($name:ident: $value:expr,)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    let expected_sum = $value;
+	            let mut a = Accumulator::new ();
+	            a.update(expected_sum);
+	            assert_eq!(a.count(), 1);
+	            assert_eq!(a.sum(), expected_sum);
+	            assert_eq!(a.mean(), expected_sum);
+	            assert!(a.variance().is_nan());
+	            assert!(a.skew().is_nan());
+	            assert!(a.kurtosis().is_nan());
+
+	            assert!(a.sd().is_nan());
+	            assert!(a.coefficient_of_variation().is_nan());
+	            assert!(a.excess_kurtosis().is_nan());
+                }
+            )*
+        }
+    }
+
+    accumulator_test_for_1_input! {
+        test_accumulator_after_1_entry_0: 0.0,
+        test_accumulator_after_1_entry_1: 1.0,
+        test_accumulator_after_1_entry_2: 2.0,
+        test_accumulator_after_1_entry_3: -1.0,
+    }
+
+    ///  This macro tests for data sets with two observations.
+
+    macro_rules! accumulator_test_for_2_inputs {
+        ($($name:ident: $value:expr,)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    let (input1,input2,expected_variance) = $value;
+	            let sum = input1+input2;
+	            let mut a = Accumulator::new ();
+	            a.update(input1);
+	            a.update(input2);
+	            assert_eq!(a.count(), 2);
+	            assert_eq!(a.sum(), sum);
+	            assert_eq!(a.mean(), sum/2.0);
+	            assert_eq!(expected_variance, a.variance(), "Variance");
+	            assert!(a.skew().is_nan());
+	            assert!(a.kurtosis().is_nan() || a.kurtosis().is_infinite());
+
+	            assert_eq!(a.sd(), a.variance().sqrt(), "SD");
+	            assert_eq_or_nan!(a.coefficient_of_variation(), a.sd () / a.mean ());
+	            assert!(a.excess_kurtosis().is_nan() || a.excess_kurtosis().is_infinite());
+                }
+            )*
+        }
+    }
+    accumulator_test_for_2_inputs! {
+        test_accumulator_after_2_inputs_0: (0.0, 0.0, 0.0),
+        test_accumulator_after_2_inputs_1: (2.0, 0.0, 2.0),
+        test_accumulator_after_2_inputs_2: (2.0, 1.0, 0.5),
+    }
+
+    ///  This macro tests for data sets with three observations.
+
+    macro_rules! accumulator_test_for_3_inputs {
+        ($($name:ident: $value:expr,)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    let (input1,input2,input3,expected_variance, expected_skew) = $value;
+	            let sum = input1+input2+input3;
+	            let mut a = Accumulator::new ();
+	            a.update(input1);
+	            a.update(input2);
+	            a.update(input3);
+	            assert_eq!(a.count(), 3);
+	            assert_eq!(a.sum(), sum);
+	            assert_eq!(a.mean(), sum/3.0);
+	            assert_eq!(expected_variance, a.variance(), "Variance");
+	            assert_eq!(expected_skew,a.skew());
+	            assert!(a.kurtosis().is_nan() || a.kurtosis().is_infinite());
+
+	            assert_eq!(a.sd(), a.variance().sqrt(), "SD");
+	            assert_eq_or_nan!(a.coefficient_of_variation(), a.sd () / a.mean ());
+	            assert!(a.excess_kurtosis().is_nan() || a.excess_kurtosis().is_infinite());
+                }
+            )*
+        }
+    }
+    accumulator_test_for_3_inputs! {
+        test_accumulator_after_3_inputs_0: (0.0, 2.0, 1.0, 1.0, 0.0),
+        test_accumulator_after_3_inputs_1: (1.0, 4.0, 1.0, 3.0, 1.7320508075688776),
+        test_accumulator_after_3_inputs_2: (3.0, 0.0, 0.0, 3.0, 1.7320508075688776),
+    }
+
+    #[test]
+    fn test_accumulator_after_4_inputs ()
+    {
+	let mut a = Accumulator::new ();
+	a.update(1.0);
+	a.update(1.0);
+	a.update(1.0);
+	a.update(0.0);
+	assert_eq!(a.count(), 4);
+	assert_eq!(a.sum(), 3.0);
+	assert_eq!(a.mean(), 0.75);
+	assert_eq!(a.variance(), 0.25);
+	assert_eq!(a.skew(), -2.0);  // -0.5
+	assert_eq!(a.kurtosis(), 4.0, "Kurt"); // -32.375
+
+	assert_eq!(a.sd(), a.variance().sqrt());
+	assert_eq!(a.coefficient_of_variation(), a.sd () / a.mean ());
+	assert_eq!(a.kurtosis(), a.excess_kurtosis() + 3.0);
+    }
+
+    #[test]
+    fn test_accumulator_after_4_inputs_2 ()
+    {
+	let mut a = Accumulator::new ();
+	a.update(4.0);
+	a.update(1.0);
+	a.update(1.0);
+	a.update(1.0);
+	assert_eq!(a.count(), 4);
+	assert_eq!(a.sum(), 7.0);
+	assert_eq!(a.mean(), 1.75);
+	assert_eq!(a.variance(), 2.25);
+	assert_eq!(a.skew(), 2.0);  // 0.5
+	assert_eq!(a.kurtosis(), 4.0, "Kurt"); // -10.97582304526749
+
+	assert_eq!(a.sd(), a.variance().sqrt());
+	assert_eq!(a.coefficient_of_variation(), a.sd () / a.mean ());
+	assert_eq!(a.kurtosis(), a.excess_kurtosis() + 3.0);
     }
 }
