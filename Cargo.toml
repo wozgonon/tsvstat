@@ -3,4 +3,12 @@ name = "tsvstat"
 version = "0.2.0"
 authors = ["jb <wozgonon@gmail.com>"]
 
+[lib]
+name = "tsvstat"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tsvstatbin"
+path = "src/main.rs"
+
 [dependencies]

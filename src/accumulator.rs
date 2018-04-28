@@ -1,4 +1,7 @@
 use std::f64;
+use std::io;
+use std::io::BufRead;
+use std::io::Read;
 
 /// An accumulator adds up a sequence of numerical observations and providing
 /// a set of summary statistics for those numbers.
@@ -129,6 +132,21 @@ impl Accumulators {
     pub fn rows(&self) -> usize { return self.rows; }
     pub fn column(&self) -> usize { return self.column; } // COLUMNS
 
+    pub fn parse_tsv<R : Read> (&mut self, buffer : &mut io::BufReader<R>) {
+        let delimiter = "\t";
+        for line in buffer.lines() {
+            match line {
+                Err(message) => eprintln!("Error '{}' while parsing line", message),
+                Ok(string) => {
+                    let mut split = string.split(delimiter);
+                    self.new_row();
+                    for value in split {
+                        self.add_column_value(value);
+                    }
+                }
+            }
+        }
+    }
     pub fn new_row(&mut self)
     {
         self.rows = self.rows + 1;
@@ -166,7 +184,7 @@ impl Accumulators {
 
     pub fn print_tsv (&self)
     {
-        print! ("Name: ", );
+        print! ("Name", );
         for s in self.headers.iter() {
        	   print! ("\t{:.2}", s);
         }
