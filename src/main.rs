@@ -9,7 +9,8 @@ fn main() {
     let mut accumulators = accumulator::Accumulators::new();
     let reader = io::stdin();
     let mut buffer = io::BufReader::new(reader);
+    let mut output = io::stdout ();
     accumulators.parse_tsv(&mut buffer);
-    accumulators.print_tsv ();
+    accumulators.print_tsv (&mut output);
 }
 

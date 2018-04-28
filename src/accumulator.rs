@@ -2,6 +2,7 @@ use std::f64;
 use std::io;
 use std::io::BufRead;
 use std::io::Read;
+use std::io::Write;
 
 /// An accumulator adds up a sequence of numerical observations and providing
 /// a set of summary statistics for those numbers.
@@ -174,34 +175,44 @@ impl Accumulators {
         self.column = self.column + 1;
     }
 
-    fn print_array (&self, name : &str, function : &Fn(&Accumulator) -> f64) {
-       print! ("{}", name);
-       for s in self.columns.iter() {
-       	   print! ("\t{:.2}", function(s));
-       }
-       println! ("");
+    fn print(&self, output : &mut Write, text : &str) {
+        match output.write(text.as_bytes()) {
+            Ok(_) => {},
+            Err(message) => {
+                eprintln!("Error in print '{}'", message);
+            }
+        }
     }
 
-    pub fn print_tsv (&self)
+    fn print_array (&self, output : &mut Write, name : &str, function : &Fn(&Accumulator) -> f64) {
+       self.print (output, name);
+       for s in self.columns.iter() {
+       	   self.print (output, format! ("\t{:.2}", function(s)).as_str());
+       }
+        self.print (output, "\n");
+    }
+
+
+    pub fn print_tsv (&self, output : &mut Write)
     {
-        print! ("Name", );
+        self.print (output, "Name");
         for s in self.headers.iter() {
-       	   print! ("\t{:.2}", s);
+            self.print (output, format!("\t{:.2}", s).as_str());
         }
-        println! ("");
-        self.print_array ("Rows",  &| s| s.count () as f64 );
-    	self.print_array ("Sum",   &| s| s.sum () );
-    	self.print_array ("Min",   &| s| s.min () );
-        self.print_array ("Max",   &| s| s.max () );
-	    self.print_array ("Range", &| s| s.range () );
-    	self.print_array ("Mean",  &| s| s.mean () );
-    	self.print_array ("SD",    &| s| s.sd () );
-        self.print_array ("VAR",    &| s| s.variance () );
-        self.print_array ("PVAR",    &| s| s.population_variance () );
-        self.print_array ("CV",    &| s| s.coefficient_of_variation() );
-    	self.print_array ("Skew",  &| s| s.skew () );
-    	self.print_array ("Kurt",  &| s| s.kurtosis () );
-    	self.print_array ("xKurt",  &| s| s.excess_kurtosis () );
+        self.print (output, "\n");
+        self.print_array (output,"Rows",  &| s| s.count () as f64 );
+    	self.print_array (output,"Sum",   &| s| s.sum () );
+    	self.print_array (output,"Min",   &| s| s.min () );
+        self.print_array (output,"Max",   &| s| s.max () );
+	    self.print_array (output,"Range", &| s| s.range () );
+    	self.print_array (output,"Mean",  &| s| s.mean () );
+    	self.print_array (output,"SD",    &| s| s.sd () );
+        self.print_array (output,"VAR",    &| s| s.variance () );
+        self.print_array (output,"PVAR",    &| s| s.population_variance () );
+        self.print_array (output,"CV",    &| s| s.coefficient_of_variation() );
+    	self.print_array (output,"Skew",  &| s| s.skew () );
+    	self.print_array (output,"Kurt",  &| s| s.kurtosis () );
+    	self.print_array (output,"xKurt",  &| s| s.excess_kurtosis () );
     }
 }
 
