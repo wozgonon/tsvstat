@@ -139,37 +139,6 @@ impl Accumulator {
     }
 }
 
-/*
-
-impl Format for PositiveInteger {
-    fn format(value: PositiveInteger) -> String { return "+Int".to_string(); }
-}
-impl Format for NegativeInteger {
-    fn format(value: PositiveInteger) -> String { return "-Int".to_string(); }
-}
-impl Format for Integer {
-    fn format(value: PositiveInteger) -> String { return "Int".to_string(); }
-}
-impl Format for PostiveReal {
-    fn format(value: PostiveReal) -> String { return "+Real".to_string(); }
-}
-impl Format for NegativeReal {
-    fn format(value: NegativeReal) -> String { return "-Real".to_string(); }
-}
-impl Format for PositiveInteger {
-    fn format(value: PositiveInteger) -> String { return "Real".to_string(); }
-}
-impl Format for PositiveInteger {
-    fn format(value: PositiveInteger) -> String { return "+Int".to_string(); }
-}
-impl Format for NotNumeric {
-    fn format(value: PositiveInteger) -> String { return "NotNum".to_string(); }
-}
-impl Format for Constant {
-    fn format(value: Constant) -> String { return format!("{}", value); }
-}
-*/
-
 trait Format {
     fn format(&self) -> String;
 }
