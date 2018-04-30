@@ -2,13 +2,14 @@ use std::vec::Vec;
 
 pub struct Parser {
     stack : Vec<String>,
+    execution_stack : Vec<f64>,
     previous_was_operator : bool
 }
 
 impl Parser {
 
     pub fn new () -> Parser {
-        return Parser { stack : Vec::new (), previous_was_operator : false };
+        return Parser { stack : Vec::new (), execution_stack : Vec::new(), previous_was_operator : false };
     }
 
     fn copy_chars(vec : &Vec<char>) -> String {
@@ -21,30 +22,43 @@ impl Parser {
         //}
         return s;
     }
-    pub fn parse_tokens (&mut self) {
-    }
-    pub fn parse_text (&mut self, text : &str) {
+    pub fn parse_text (&mut self, text : &str) -> f64 {
         let mut  token : Vec<char>  = Vec::new();
         for ch in text.chars() {
+            println!("PARSE {} LEN={}", ch, token.len());
             if ch.is_alphabetic() {
                 token.push(ch);
             } else if ch.is_numeric() {
                 token.push(ch);
             } else {
                 if token.len() > 0 {
-                    self.next (Parser::copy_chars(&token)).unwrap_err();
-                } else {
-                    self.next (ch.to_string()).unwrap_err();
+                    self.next (Parser::copy_chars(&token)).unwrap();
                 }
+                self.next (ch.to_string()).unwrap();
                 token.clear();
             }
         }
         if token.len() > 0 {
-            self.next (Parser::copy_chars(&token)).unwrap_err();
+            self.next (Parser::copy_chars(&token)).unwrap();
+            token.clear();
+        }
+        self.close();
+        return self.execution_stack.pop().unwrap();
+    }
+
+    fn close (&mut self)
+    {
+        while self.stack.len () > 0 {
+            let value = self.stack.pop ().unwrap();
+            self.backend_next (&value);
         }
     }
+
     fn next (&mut self, in_token : String) -> Result<bool,&str> {
         let mut token = in_token.to_string();
+
+        println!("NEXT: {} ", token);
+
         if token == " " {
             return Ok(true);
         }
@@ -73,12 +87,14 @@ impl Parser {
         let priority = Parser::priority (&token);
         if priority == -1 {
             self.previous_was_operator = false;
+            println!("PRIORITY -1{}", token);
             self.backend_next (&token);  // Just output any literals directly
             return Ok(true);
         }
         self.previous_was_operator = true;
 
         if priority == -2 {
+            println!("PRIORITY -2{}", token);
             self.stack.push (token);
             return Ok(true);
         }
@@ -93,14 +109,42 @@ impl Parser {
                 break
             }
             self.stack.pop ().unwrap();
+            println!("ABC {}", previous_operator);
             self.backend_next (&previous_operator);
         }
         self.stack.push (token);
         return Ok(true);
     }
 
-    fn backend_next (&self, token : &String) {
-        print!("{} ", token);
+
+    fn backend_next (&mut self, token : &String){
+        println!("STACK: {} ", token);
+
+        if token == "+" {
+            self.add();
+            println!("ADD: {} LEN:{}", token, self.execution_stack.len());
+        } else if token == "*" {
+            self.times();
+            println!("TIMES: {} LEN:{}", token, self.execution_stack.len());
+        } else {
+            self.execution_stack.push(token.parse::<f64>().unwrap());
+        }
+    }
+    fn add (&mut self) {
+        let top1 = self.pop();
+        let top2 = self.pop();
+        self.push (top1+top2);
+    }
+    fn times (&mut self) {
+        let top1 = self.pop();
+        let top2 = self.pop();
+        self.push (top1*top2);
+    }
+    fn pop (&mut self) -> f64 {
+        return self.execution_stack.pop().unwrap();
+    }
+    fn push (&mut self, value : f64) {
+        return self.execution_stack.push(value);
     }
     fn right_to_left_associative(token : &String) -> bool
     {
@@ -149,8 +193,27 @@ impl Parser {
 mod tests {
     use expression::Parser;
 
+    #[test]
     fn should_parse () {
         let mut parser = Parser::new ();
-        parser.parse_text("1+2");
+
+        assert_eq! (parser.execution_stack.len(), 0);
+        assert_eq! (parser.parse_text("7+2"), 9.);
+
+        assert_eq! (parser.execution_stack.len(), 0);
+        assert_eq! (parser.parse_text("7+2+3"), 12.);
+
+        assert_eq! (parser.execution_stack.len(), 0);
+        assert_eq! (parser.parse_text("7+2*3"), 13.);
+
+        assert_eq! (parser.execution_stack.len(), 0);
+        assert_eq! (parser.parse_text("1+2*5"), 11.);
+
+        assert_eq! (parser.execution_stack.len(), 0);
+        //assert_eq! (parser.parse_text("2*5+9"), 19.); // FIXME 28
+
+        assert_eq! (parser.execution_stack.len(), 0);
+        //assert_eq! (parser.parse_text("1+2*5+9"), 20.); // FIXME
+
     }
 }
