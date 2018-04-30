@@ -17,13 +17,21 @@ $ cargo install
 
 ## Summary statistics
 
-* count and sum
-* min, max and range
-* [Mean](https://en.wikipedia.org/wiki/mean)
-* [Standard deviation](https://en.wikipedia.org/wiki/Standard_deviation)
-* [Skew](https://en.wikipedia.org/wiki/skew)
-* [Kurtosis and excess Kurtosis](https://en.wikipedia.org/wiki/kurtosis)
+These statistics are calculated on streaming data:
 
+* Count
+* Sum
+* [Range](https://en.wikipedia.org/wiki/Range), min, max
+* [Mean](https://en.wikipedia.org/wiki/Mean)
+* [Standard deviation](https://en.wikipedia.org/wiki/Standard_deviation)
+* [Variance](https://en.wikipedia.org/wiki/Variance)
+* [Skew](https://en.wikipedia.org/wiki/Skewness)
+* [Kurtosis and excess Kurtosis](https://en.wikipedia.org/wiki/kurtosis)
+* [Coefficient of Variation](https://en.wikipedia.org/wiki/Coefficient_of_Variation)
+
+## Numeric type
+
+One of the following is displayed to indicating the type of the data in each column: Binary, +Integer, -Integer, Integer, -Real, +Real, Real or Not Numeric.
 
 ## Future additions
 
@@ -32,7 +40,7 @@ $ cargo install
 * Correlation table
 * Multiple regression - choose one table as the independent variable or y and the others as dependent variables or x's
 
-### Median, Quartiles and Percentiles
+### Robust statistics - Median, Quartiles and Percentiles
 
 One cannot always calculates the median, quartiles or percentiles for two reasons, first it would require sorting the data first
 and secondly it would require holding the entire dataset in memory rather than just streaming inputs.

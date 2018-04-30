@@ -110,6 +110,48 @@ impl Accumulator {
     pub fn coefficient_of_variation(&self) -> f64 {
         return self.sd () / self.mean ();
     }
+
+    pub fn numeric_type (&self) -> String {
+        if self.min == self.max { return self.min.to_string (); }
+        if self.count () == 0 { return "NotNum".to_string(); }
+
+        let is_integer = self.sum2.sum == self.sum2.sum.trunc(); // FIXME This does not always work
+        if self.min == 0.&& self.max == 1. && is_integer {
+            return "Binary".to_string();
+        }
+
+        if is_integer {
+            if self.max < 0. {
+                return "-Int".to_string();
+            } else if self.min > 0.  {
+                return "+Int".to_string();
+            } else {
+                return "Int".to_string();
+            }
+        }
+        if self.max < 0. {
+            return "-Real".to_string();
+        } else if self.min > 0.  {
+            return "+Real".to_string();
+        } else {
+            return "Real".to_string();
+        }
+    }
+}
+
+trait Format {
+    fn format(&self) -> String;
+}
+
+impl Format for String {
+    fn format (&self) -> String {
+        return format! ("\t{}", self.to_string());
+    }
+}
+impl Format for f64 {
+    fn format (&self) -> String {
+        return format!("\t{:.2}", self);
+    }
 }
 
 /// Generates a table of summary statistics for a sequence of rows of numerical data.
@@ -156,10 +198,10 @@ impl Accumulators {
         self.column = self.column + 1;
     }
 
-    fn print_array (&self, name : &str, function : &Fn(&Accumulator) -> f64) {
+    fn print_array<T : Format> (&self, name : &str, function : &Fn(&Accumulator) -> T) {
        print! ("{}", name);
        for s in self.columns.iter() {
-       	   print! ("\t{:.2}", function(s));
+       	   print! ("{}", function(s).format());
        }
        println! ("");
     }
@@ -172,6 +214,7 @@ impl Accumulators {
         }
         println! ("");
         self.print_array ("Rows",  &| s| s.count () as f64 );
+        self.print_array ("Type",   &| s| s.numeric_type () );
     	self.print_array ("Sum",   &| s| s.sum () );
     	self.print_array ("Min",   &| s| s.min () );
         self.print_array ("Max",   &| s| s.max () );
@@ -229,6 +272,25 @@ mod tests {
         // assert_eq!((PI+E)*TIMES, value.as_f64());  // This fails 58592.88494600633 against 58592.884946006336
     }
 
+    #[test]
+    fn error_bound_should_be_less_than_summing() {
+        let mut sum = Sum::zero();
+        let mut value = 0.;
+        for xx in 0..99 {
+            let addition = xx as f64 / 100.0;
+            value = value + addition;
+            sum.add (addition);
+        }
+        value = value + PI + E;
+        sum.add(PI + E);
+        let sum_0_99 = 99*98/2;
+        let expected_sum = sum_0_99 as f64 / 100.0 + PI + E;
+        // TODO Find more convoluted examples
+        //println!("COMPARE {} < {} ", (sum.sum - expected_sum).abs (), (value - expected_sum).abs());
+        assert!((sum.sum - expected_sum).abs () <= (value - expected_sum).abs());
+    }
+
+
     ///  This macro is for checking that two floating point numbers have the same value or both are NaN.
     ///  since Nan!=Nan by definition, one cannot just rely on assert_eq!
 
@@ -246,6 +308,48 @@ mod tests {
                 }
             }
         });
+    }
+    #[test]
+    fn test_numeric_type () {
+        let mut a = Accumulator::new ();
+        assert_eq! (a.numeric_type(), "NotNum");
+        a.update(1.);
+        assert_eq! (a.numeric_type(), "1"); //, format!("sum={} type={}", a.sum(), a.numeric_type()));
+        a.update(1.);
+        a.update(1.);
+        assert_eq! (a.numeric_type(), "1");
+        a.update(2.);
+        assert_eq! (a.numeric_type(), "+Int");
+        a.update(-1.);
+        assert_eq! (a.numeric_type(), "Int");
+        a.update(2.2);
+        assert_eq! (a.numeric_type(), "Real");
+    }
+    #[test]
+    fn test_negative_numeric_type () {
+        let mut a = Accumulator::new ();
+        assert_eq! (a.numeric_type(), "NotNum");
+        a.update(-1.);
+        assert_eq! (a.numeric_type(), "-1");  //, format!("sum={} type={}", a.sum(), a.numeric_type()));
+        a.update(-2.);
+        assert_eq! (a.numeric_type(), "-Int");
+        a.update(-1.1);
+        assert_eq! (a.numeric_type(), "-Real");
+        a.update(2.2);
+        assert_eq! (a.numeric_type(), "Real");
+    }
+    #[test]
+    fn test_positive_numeric_type () {
+        let mut a = Accumulator::new ();
+        assert_eq! (a.numeric_type(), "NotNum");
+        a.update(11.);
+        assert_eq! (a.numeric_type(), "11"); //, format!("sum={} type={}", a.sum(), a.numeric_type()));
+        a.update(2.);
+        assert_eq! (a.numeric_type(), "+Int");
+        a.update(3.2);
+        assert_eq! (a.numeric_type(), "+Real");
+        a.update(-23.2);
+        assert_eq! (a.numeric_type(), "Real");
     }
 
     #[test]
