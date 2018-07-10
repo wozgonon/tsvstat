@@ -4,3 +4,9 @@ version = "0.2.0"
 authors = ["jb <wozgonon@gmail.com>"]
 
 [dependencies]
+
+
+[lib]
+path = "src/lib.rs"
+test = true
+doctest = true

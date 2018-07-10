@@ -11,7 +11,7 @@ cat tests/test1.tsv | tsvstat.exe
 
 ```
 $ cargo build
-$ cargo tests
+$ cargo test
 $ cargo install
 ```
 

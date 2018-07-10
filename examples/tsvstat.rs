@@ -1,7 +1,5 @@
-//use expression::Parser;
-
-mod accumulator;
-mod expression;
+extern crate tsvstat;
+use tsvstat::accumulator;
 
 fn main() {
 
